@@ -8,3 +8,4 @@ target/
 .DS_Store
 .env
 application-local.yml
+web/node_modules/
