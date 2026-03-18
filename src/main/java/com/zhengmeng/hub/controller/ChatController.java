@@ -77,8 +77,8 @@ public class ChatController {
             messages = messageRepository.findByUserIdAndChannelOrderByCreatedAtDesc(userId, channel, PageRequest.of(0, limit));
         }
 
-        // 倒转为正序
-        messages = messages.reversed();
+        // 倒转为正序（Java 17 兼容写法）
+        java.util.Collections.reverse(messages);
 
         List<Map<String, Object>> result = messages.stream().map(this::toMessageView).toList();
         return ResponseEntity.ok(Map.of(
