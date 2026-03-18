@@ -262,6 +262,33 @@ public class DeviceController {
             .body(new org.springframework.core.io.FileSystemResource(file));
     }
 
+    /** PC 查询文件元信息 */
+    @GetMapping("/files/{fileId}/info")
+    public ResponseEntity<?> fileInfo(
+            @PathVariable String fileId,
+            @RequestHeader("X-Device-Id") String deviceId,
+            @RequestHeader("X-Device-Signature") String signature,
+            @RequestHeader("X-Device-Timestamp") long timestamp) {
+
+        HubDevice device = deviceAuthService.verifySignature(deviceId, signature, "", timestamp);
+        if (device == null) {
+            return ResponseEntity.status(401).body(Map.of("ok", false, "error", "签名验证失败"));
+        }
+
+        HubFile hubFile = fileRepository.findById(fileId).orElse(null);
+        if (hubFile == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        return ResponseEntity.ok(Map.of(
+            "ok", true,
+            "fileId", hubFile.getFileId(),
+            "fileName", hubFile.getFileName() != null ? hubFile.getFileName() : "",
+            "fileSize", hubFile.getFileSize(),
+            "contentType", hubFile.getContentType() != null ? hubFile.getContentType() : ""
+        ));
+    }
+
     // ─── 请求类 ─────────────────────────────────────────
 
     @Data
