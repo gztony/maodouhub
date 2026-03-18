@@ -45,7 +45,15 @@ export function ChatPage() {
         if (res.ok) {
           setPcOnline(res.pcOnline);
           if (res.messages && res.messages.length > 0) {
-            setMessages(prev => [...prev, ...res.messages]);
+            setMessages(prev => {
+              // 把所有 delivering/sending 状态的用户消息标记为 completed（因为收到了回复说明 PC 已处理）
+              const updated = prev.map(m =>
+                (m.role === "user" && (m.status === "delivering" || m.status === "sending"))
+                  ? { ...m, status: "completed" }
+                  : m
+              );
+              return [...updated, ...res.messages];
+            });
             setTimeout(scrollToBottom, 100);
           }
           setStreaming(res.streaming || null);
