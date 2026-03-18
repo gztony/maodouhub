@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MaoDouHub 管理后台</title>
+<style>
+:root { --bg: #0f1923; --card: #1a2632; --border: #2a3a4a; --text: #e8edf2; --muted: #8899aa; --green: #22c55e; --red: #ef4444; --blue: #3b82f6; --yellow: #eab308; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, "PingFang SC", sans-serif; background: var(--bg); color: var(--text); padding: 20px; }
+h1 { font-size: 22px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+h1 span { font-size: 14px; color: var(--muted); font-weight: normal; }
+h2 { font-size: 16px; margin-bottom: 12px; color: var(--muted); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.stat-value { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+.stat-label { font-size: 12px; color: var(--muted); }
+.stat-card.green .stat-value { color: var(--green); }
+.stat-card.blue .stat-value { color: var(--blue); }
+.stat-card.yellow .stat-value { color: var(--yellow); }
+
+.section { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; color: var(--muted); font-weight: 500; padding: 8px 6px; border-bottom: 1px solid var(--border); }
+td { padding: 8px 6px; border-bottom: 1px solid var(--border); }
+tr:last-child td { border-bottom: none; }
+
+.badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+.badge.online { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge.offline { background: rgba(239,68,68,0.15); color: var(--red); }
+.badge.user { background: rgba(59,130,246,0.15); color: var(--blue); }
+.badge.assistant { background: rgba(234,179,8,0.15); color: var(--yellow); }
+.badge.completed { background: rgba(34,197,94,0.15); color: var(--green); }
+.badge.delivering { background: rgba(234,179,8,0.15); color: var(--yellow); }
+.badge.failed { background: rgba(239,68,68,0.15); color: var(--red); }
+
+.refresh-info { font-size: 11px; color: var(--muted); text-align: right; margin-bottom: 8px; }
+.jvm-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 8px; }
+.jvm-bar-fill { height: 100%; background: var(--blue); border-radius: 4px; transition: width 0.5s; }
+</style>
+</head>
+<body>
+
+<h1>🫛 MaoDouHub 管理后台 <span id="uptime"></span></h1>
+
+<div class="refresh-info">每 5 秒自动刷新 · <span id="lastRefresh"></span></div>
+
+<!-- 核心指标 -->
+<div class="grid" id="statsGrid">
+  <div class="stat-card blue"><div class="stat-value" id="totalUsers">-</div><div class="stat-label">注册用户</div></div>
+  <div class="stat-card green"><div class="stat-value" id="onlineDevices">-</div><div class="stat-label">在线设备</div></div>
+  <div class="stat-card"><div class="stat-value" id="totalDevices">-</div><div class="stat-label">总设备数</div></div>
+  <div class="stat-card yellow"><div class="stat-value" id="totalMessages">-</div><div class="stat-label">总消息数</div></div>
+  <div class="stat-card"><div class="stat-value" id="totalFiles">-</div><div class="stat-label">总文件数</div></div>
+  <div class="stat-card"><div class="stat-value" id="totalFileSizeMB">-</div><div class="stat-label">文件总大小 (MB)</div></div>
+</div>
+
+<!-- JVM 状态 -->
+<div class="section">
+  <h2>JVM 运行状态</h2>
+  <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));">
+    <div><div class="stat-label">已用内存</div><div id="jvmUsed" style="font-size:18px;font-weight:600;">-</div></div>
+    <div><div class="stat-label">总内存</div><div id="jvmTotal" style="font-size:18px;font-weight:600;">-</div></div>
+    <div><div class="stat-label">最大内存</div><div id="jvmMax" style="font-size:18px;font-weight:600;">-</div></div>
+    <div><div class="stat-label">CPU 核心</div><div id="cpuCores" style="font-size:18px;font-weight:600;">-</div></div>
+    <div><div class="stat-label">活跃线程</div><div id="threadCount" style="font-size:18px;font-weight:600;">-</div></div>
+    <div><div class="stat-label">启动时间</div><div id="startTime" style="font-size:12px;margin-top:4px;">-</div></div>
+  </div>
+  <div class="jvm-bar"><div class="jvm-bar-fill" id="jvmBar" style="width:0%"></div></div>
+</div>
+
+<!-- 设备列表 -->
+<div class="section">
+  <h2>设备列表</h2>
+  <table>
+    <thead><tr><th>设备 ID</th><th>用户</th><th>名称</th><th>状态</th><th>连接方式</th><th>最后心跳</th></tr></thead>
+    <tbody id="deviceTable"><tr><td colspan="6" style="color:var(--muted)">加载中...</td></tr></tbody>
+  </table>
+</div>
+
+<!-- 最近消息 -->
+<div class="section">
+  <h2>最近消息（最新 20 条）</h2>
+  <table>
+    <thead><tr><th>时间</th><th>用户</th><th>角色</th><th>内容</th><th>状态</th></tr></thead>
+    <tbody id="messageTable"><tr><td colspan="5" style="color:var(--muted)">加载中...</td></tr></tbody>
+  </table>
+</div>
+
+<script>
+async function refresh() {
+  try {
+    // 统计数据
+    const stats = await fetch('/admin/api/stats').then(r => r.json());
+    document.getElementById('totalUsers').textContent = stats.totalUsers;
+    document.getElementById('onlineDevices').textContent = stats.onlineDevices;
+    document.getElementById('totalDevices').textContent = stats.totalDevices;
+    document.getElementById('totalMessages').textContent = stats.totalMessages;
+    document.getElementById('totalFiles').textContent = stats.totalFiles;
+    document.getElementById('totalFileSizeMB').textContent = stats.totalFileSizeMB;
+    document.getElementById('uptime').textContent = '运行 ' + stats.uptime;
+    document.getElementById('jvmUsed').textContent = stats.jvmUsedMemoryMB + ' MB';
+    document.getElementById('jvmTotal').textContent = stats.jvmTotalMemoryMB + ' MB';
+    document.getElementById('jvmMax').textContent = stats.jvmMaxMemoryMB + ' MB';
+    document.getElementById('cpuCores').textContent = stats.availableProcessors;
+    document.getElementById('threadCount').textContent = stats.threadCount;
+    document.getElementById('startTime').textContent = stats.startTime?.replace('T', ' ').substring(0, 19);
+    const memPct = Math.round(stats.jvmUsedMemoryMB / stats.jvmMaxMemoryMB * 100);
+    document.getElementById('jvmBar').style.width = memPct + '%';
+
+    // 设备列表
+    const devices = await fetch('/admin/api/devices').then(r => r.json());
+    const dt = document.getElementById('deviceTable');
+    if (devices.length === 0) {
+      dt.innerHTML = '<tr><td colspan="6" style="color:var(--muted)">暂无设备</td></tr>';
+    } else {
+      dt.innerHTML = devices.map(d => `<tr>
+        <td style="font-family:monospace;font-size:12px">${d.deviceId}</td>
+        <td>${d.userId}</td>
+        <td>${d.deviceName || '-'}</td>
+        <td><span class="badge ${d.online ? 'online' : 'offline'}">${d.online ? '在线' : '离线'}</span></td>
+        <td>${d.channelType || '-'}</td>
+        <td style="font-size:12px">${d.lastHeartbeat ? d.lastHeartbeat.replace('T', ' ').substring(0, 19) : '-'}</td>
+      </tr>`).join('');
+    }
+
+    // 最近消息
+    const msgs = await fetch('/admin/api/recent-messages').then(r => r.json());
+    const mt = document.getElementById('messageTable');
+    if (msgs.length === 0) {
+      mt.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">暂无消息</td></tr>';
+    } else {
+      mt.innerHTML = msgs.map(m => `<tr>
+        <td style="font-size:12px;white-space:nowrap">${m.createdAt?.replace('T', ' ').substring(0, 19)}</td>
+        <td>${m.userId}</td>
+        <td><span class="badge ${m.role}">${m.role === 'user' ? '用户' : '助理'}</span></td>
+        <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(m.content || '')}</td>
+        <td><span class="badge ${m.status}">${m.status}</span></td>
+      </tr>`).join('');
+    }
+
+    document.getElementById('lastRefresh').textContent = new Date().toLocaleTimeString('zh-CN');
+  } catch (e) {
+    console.error('刷新失败:', e);
+  }
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+
+</body>
+</html>
