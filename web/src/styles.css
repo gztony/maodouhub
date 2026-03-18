@@ -237,6 +237,44 @@ body {
   color: var(--error);
 }
 
+.bubble-text { word-break: break-word; }
+.bubble-text code { background: rgba(255,255,255,0.1); padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+.bubble-text pre { background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
+.bubble-text pre code { background: none; padding: 0; }
+.bubble-text strong { font-weight: 600; }
+.bubble-text hr { border: none; border-top: 1px solid rgba(255,255,255,0.15); margin: 8px 0; }
+
+.bubble-attachments {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.attachment-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 8px;
+  color: #60a5fa;
+  text-decoration: none;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.attachment-link:hover {
+  background: rgba(59, 130, 246, 0.25);
+}
+
+.attachment-link .file-size {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
 .streaming-indicator {
   margin-right: 4px;
 }

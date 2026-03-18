@@ -225,6 +225,43 @@ public class DeviceController {
         ));
     }
 
+    /** PC 下载附件文件（用户上传的图片/文档等） */
+    @GetMapping("/files/{fileId}/download")
+    public ResponseEntity<?> downloadFile(
+            @PathVariable String fileId,
+            @RequestHeader("X-Device-Id") String deviceId,
+            @RequestHeader("X-Device-Signature") String signature,
+            @RequestHeader("X-Device-Timestamp") long timestamp) {
+
+        HubDevice device = deviceAuthService.verifySignature(deviceId, signature, "", timestamp);
+        if (device == null) {
+            return ResponseEntity.status(401).body(Map.of("ok", false, "error", "签名验证失败"));
+        }
+
+        HubFile hubFile = fileRepository.findById(fileId).orElse(null);
+        if (hubFile == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // 只允许下载属于同一用户的文件
+        if (!hubFile.getUserId().equals(device.getUserId())) {
+            return ResponseEntity.status(403).body(Map.of("ok", false, "error", "无权访问该文件"));
+        }
+
+        java.io.File file = new java.io.File(hubFile.getStoragePath());
+        if (!file.exists()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        log.info("PC 文件下载: deviceId={}, fileId={}, name={}", deviceId, fileId, hubFile.getFileName());
+
+        return ResponseEntity.ok()
+            .header("Content-Disposition", "attachment; filename=\"" + hubFile.getFileName() + "\"")
+            .contentType(org.springframework.http.MediaType.APPLICATION_OCTET_STREAM)
+            .contentLength(hubFile.getFileSize())
+            .body(new org.springframework.core.io.FileSystemResource(file));
+    }
+
     // ─── 请求类 ─────────────────────────────────────────
 
     @Data

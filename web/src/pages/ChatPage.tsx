@@ -4,6 +4,31 @@ import type { ChatMessage, StreamingState } from "../lib/types";
 
 const POLL_INTERVAL = 3000; // 3 秒轮询
 
+/** 简单 markdown 渲染：加粗、代码块、换行 */
+function renderMarkdown(text: string): string {
+  if (!text) return "";
+  return text
+    // 代码块
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+    // 行内代码
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    // 加粗
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // 有序列表
+    .replace(/^\d+\.\s+(.+)$/gm, '<div style="padding-left:1em">• $1</div>')
+    // 分隔线
+    .replace(/^---$/gm, '<hr style="border:none;border-top:1px solid rgba(255,255,255,0.15);margin:8px 0"/>')
+    // 换行
+    .replace(/\n/g, '<br/>');
+}
+
+/** 格式化文件大小 */
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1024 / 1024).toFixed(1) + " MB";
+}
+
 export function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -168,7 +193,25 @@ export function ChatPage() {
         {messages.map((msg) => (
           <div key={msg.messageId} className={`chat-bubble ${msg.role}`}>
             <div className="bubble-content">
-              {msg.content}
+              <div className="bubble-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+              {/* 附件下载 */}
+              {msg.attachments && msg.attachments.length > 0 && (
+                <div className="bubble-attachments">
+                  {msg.attachments.map((att) => (
+                    <a
+                      key={att.fileId}
+                      className="attachment-link"
+                      href={getFileDownloadUrl(att.fileId)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      download={att.fileName}
+                    >
+                      📄 {att.fileName}
+                      {att.fileSize > 0 && <span className="file-size">({formatFileSize(att.fileSize)})</span>}
+                    </a>
+                  ))}
+                </div>
+              )}
               {msg.status === "sending" && <span className="bubble-status">发送中...</span>}
               {msg.status === "delivering" && <span className="bubble-status">处理中...</span>}
               {msg.status === "failed" && <span className="bubble-status error">发送失败</span>}
@@ -210,13 +253,36 @@ export function ChatPage() {
 
       {/* 输入栏 */}
       <div className="chat-composer">
-        <input type="file" ref={fileInputRef} onChange={handleFileSelect} hidden />
+        <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*,.pdf,.docx,.doc,.pptx,.xlsx,.txt" hidden />
+        {/* 图片专用按钮 */}
         <button
           className="attach-btn"
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => {
+            if (fileInputRef.current) {
+              fileInputRef.current.accept = "image/*";
+              fileInputRef.current.capture = "environment";
+              fileInputRef.current.click();
+            }
+          }}
           disabled={uploading || !pcOnline}
+          title="发图片"
         >
-          {uploading ? "⏳" : "📎"}
+          {uploading ? "⏳" : "📷"}
+        </button>
+        {/* 文件按钮 */}
+        <button
+          className="attach-btn"
+          onClick={() => {
+            if (fileInputRef.current) {
+              fileInputRef.current.accept = "image/*,.pdf,.docx,.doc,.pptx,.xlsx,.txt,.csv,.zip";
+              fileInputRef.current.removeAttribute("capture");
+              fileInputRef.current.click();
+            }
+          }}
+          disabled={uploading || !pcOnline}
+          title="发文件"
+        >
+          📎
         </button>
         <input
           type="text"
