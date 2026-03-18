@@ -4,11 +4,21 @@ import com.zhengmeng.hub.auth.DeviceAuthService;
 import com.zhengmeng.hub.model.HubDevice;
 import com.zhengmeng.hub.repository.DeviceRepository;
 import com.zhengmeng.hub.service.MessageRouterService;
+import com.zhengmeng.hub.config.HubProperties;
+import com.zhengmeng.hub.model.HubFile;
+import com.zhengmeng.hub.repository.FileRepository;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -29,6 +39,8 @@ public class DeviceController {
     private final DeviceRepository deviceRepository;
     private final DeviceAuthService deviceAuthService;
     private final MessageRouterService messageRouter;
+    private final FileRepository fileRepository;
+    private final HubProperties hubProperties;
 
     /** PC 首次注册设备 */
     @PostMapping("/register")
@@ -167,6 +179,50 @@ public class DeviceController {
         messageRouter.receiveStream(req.getRequestId(), req.getPhase(), req.getContent());
 
         return ResponseEntity.ok(Map.of("ok", true));
+    }
+
+    /** PC 上传结果文件 */
+    @PostMapping("/files/upload")
+    public ResponseEntity<?> uploadFile(
+            @RequestHeader("X-Device-Id") String deviceId,
+            @RequestHeader("X-Device-Signature") String signature,
+            @RequestHeader("X-Device-Timestamp") long timestamp,
+            @RequestParam("file") MultipartFile file) throws IOException {
+
+        HubDevice device = deviceAuthService.verifySignature(deviceId, signature, "", timestamp);
+        if (device == null) {
+            return ResponseEntity.status(401).body(Map.of("ok", false, "error", "签名验证失败"));
+        }
+
+        String fileId = "file-" + UUID.randomUUID().toString().substring(0, 8);
+        String month = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+        Path dir = Path.of(hubProperties.getFile().getStorageDir(), device.getUserId(), month);
+        Files.createDirectories(dir);
+
+        String safeFileName = file.getOriginalFilename() != null
+            ? file.getOriginalFilename().replaceAll("[^a-zA-Z0-9._\\-\\u4e00-\\u9fa5]", "_")
+            : "upload";
+        Path filePath = dir.resolve(fileId + "_" + safeFileName);
+        file.transferTo(filePath.toFile());
+
+        HubFile hubFile = new HubFile();
+        hubFile.setFileId(fileId);
+        hubFile.setUserId(device.getUserId());
+        hubFile.setFileName(file.getOriginalFilename());
+        hubFile.setFileSize(file.getSize());
+        hubFile.setContentType(file.getContentType());
+        hubFile.setStoragePath(filePath.toString());
+        hubFile.setDirection("result");
+        fileRepository.save(hubFile);
+
+        log.info("PC 文件上传: deviceId={}, fileId={}, name={}", deviceId, fileId, file.getOriginalFilename());
+
+        return ResponseEntity.ok(Map.of(
+            "ok", true,
+            "fileId", fileId,
+            "fileName", hubFile.getFileName(),
+            "fileSize", hubFile.getFileSize()
+        ));
     }
 
     // ─── 请求类 ─────────────────────────────────────────

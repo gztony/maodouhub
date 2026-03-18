@@ -1,8 +1,10 @@
 package com.zhengmeng.hub.service;
 
 import com.zhengmeng.hub.model.HubDevice;
+import com.zhengmeng.hub.model.HubFile;
 import com.zhengmeng.hub.model.HubMessage;
 import com.zhengmeng.hub.repository.DeviceRepository;
+import com.zhengmeng.hub.repository.FileRepository;
 import com.zhengmeng.hub.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +30,7 @@ public class MessageRouterService {
 
     private final MessageRepository messageRepository;
     private final DeviceRepository deviceRepository;
+    private final FileRepository fileRepository;
 
     /** PC 待处理消息队列：deviceId → 消息队列 */
     private final Map<String, Queue<PendingMessage>> deviceQueues = new ConcurrentHashMap<>();
@@ -120,7 +123,18 @@ public class MessageRouterService {
         reply.setStatus(status != null ? status : "completed");
         messageRepository.save(reply);
 
-        log.info("结果已保存: requestId={}, replyId={}", requestId, replyId);
+        // 关联附件文件到回复消息
+        if (attachmentFileIds != null) {
+            for (String fileId : attachmentFileIds) {
+                fileRepository.findById(fileId).ifPresent(file -> {
+                    file.setMessageId(replyId);
+                    fileRepository.save(file);
+                });
+            }
+        }
+
+        log.info("结果已保存: requestId={}, replyId={}, files={}", requestId, replyId,
+                 attachmentFileIds != null ? attachmentFileIds.size() : 0);
     }
 
     /**

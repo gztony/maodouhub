@@ -1,7 +1,9 @@
 package com.zhengmeng.hub.controller;
 
+import com.zhengmeng.hub.model.HubFile;
 import com.zhengmeng.hub.model.HubMessage;
 import com.zhengmeng.hub.repository.DeviceRepository;
+import com.zhengmeng.hub.repository.FileRepository;
 import com.zhengmeng.hub.repository.MessageRepository;
 import com.zhengmeng.hub.service.MessageRouterService;
 import lombok.Data;
@@ -28,6 +30,7 @@ public class ChatController {
     private final MessageRouterService messageRouter;
     private final MessageRepository messageRepository;
     private final DeviceRepository deviceRepository;
+    private final FileRepository fileRepository;
 
     /** 发送消息 */
     @PostMapping("/send")
@@ -134,6 +137,18 @@ public class ChatController {
         view.put("status", msg.getStatus());
         view.put("createdAt", msg.getCreatedAt().toString());
         if (msg.getWidgetJson() != null) view.put("widget", msg.getWidgetJson());
+
+        // 附件文件
+        List<HubFile> files = fileRepository.findByMessageId(msg.getMessageId());
+        if (!files.isEmpty()) {
+            view.put("attachments", files.stream().map(f -> Map.of(
+                "fileId", f.getFileId(),
+                "fileName", f.getFileName(),
+                "fileSize", f.getFileSize(),
+                "downloadUrl", "/api/files/" + f.getFileId() + "/download"
+            )).toList());
+        }
+
         return view;
     }
 
